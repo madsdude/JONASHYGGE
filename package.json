@@ -1,0 +1,29 @@
+{
+  "name": "handihotel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "HandiHotel — Full-scale 3D multiplayer browser game inspired by classic Habbo Hotel",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n SERVER,CLIENT -c cyan,magenta \"npm run dev -w @handihotel/server\" \"npm run dev -w @handihotel/client\"",
+    "dev:server": "npm run dev -w @handihotel/server",
+    "dev:client": "npm run dev -w @handihotel/client",
+    "build": "npm run build -w @handihotel/shared && npm run build -w @handihotel/server && npm run build -w @handihotel/client",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "db:generate": "npm run db:generate -w @handihotel/server",
+    "db:push": "npm run db:push -w @handihotel/server",
+    "db:seed": "npm run db:seed -w @handihotel/server",
+    "docker:up": "docker compose up --build -d",
+    "docker:down": "docker compose down"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "@playwright/test": "^1.51.1",
+    "typescript": "^5.8.2",
+    "vitest": "^3.1.1"
+  }
+}

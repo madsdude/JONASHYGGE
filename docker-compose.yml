@@ -1,0 +1,70 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: handihotel
+      POSTGRES_PASSWORD: handihotel_secret
+      POSTGRES_DB: handihotel
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U handihotel -d handihotel"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 3s
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://handihotel:handihotel_secret@postgres:5432/handihotel?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-handihotel-super-secret-dev-key-change-in-production}
+      CLIENT_URL: ${CLIENT_URL:-http://localhost:5173}
+      STORAGE_MODE: ${STORAGE_MODE:-auto}
+
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile.client
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:4000}
+        VITE_SOCKET_URL: ${VITE_SOCKET_URL:-http://localhost:4000}
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    depends_on:
+      - server
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:4000}
+      VITE_SOCKET_URL: ${VITE_SOCKET_URL:-http://localhost:4000}
+
+volumes:
+  postgres_data:

@@ -1,0 +1,228 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String    @id @default(cuid())
+  username       String    @unique
+  email          String    @unique
+  passwordHash   String
+  motto          String    @default("Welcome to HandiHotel!")
+  credits        Int       @default(1500)
+  stars          Int       @default(100)
+  role           String    @default("USER")
+  banned         Boolean   @default(false)
+  avatarConfig   Json
+  lastDailyClaim DateTime?
+  dailyStreak    Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  ownedRooms          Room[]             @relation("RoomOwner")
+  placedFurniture     PlacedFurniture[]  @relation("FurnitureOwner")
+  inventory           InventoryItem[]
+  sentFriendships     Friendship[]       @relation("FriendshipRequester")
+  receivedFriendships Friendship[]       @relation("FriendshipAddressee")
+  sentMessages        DirectMessage[]    @relation("MessageSender")
+  receivedMessages    DirectMessage[]    @relation("MessageReceiver")
+  transactions        Transaction[]
+  tradesAsA           TradeLog[]         @relation("TradeUserA")
+  tradesAsB           TradeLog[]         @relation("TradeUserB")
+  filedReports        ModerationReport[] @relation("ReportReporter")
+  receivedReports     ModerationReport[] @relation("ReportTarget")
+  minigameScores      MinigameScore[]
+
+  @@index([role])
+  @@index([banned])
+}
+
+model Room {
+  id                String   @id @default(cuid())
+  name              String
+  description       String   @default("")
+  ownerId           String?
+  isPublic          Boolean  @default(true)
+  isOfficial        Boolean  @default(false)
+  theme             String   @default("private")
+  templateId        String   @default("studio")
+  width             Int      @default(12)
+  height            Int      @default(12)
+  floorStyle        String   @default("wood_warm")
+  wallStyle         String   @default("cream_plaster")
+  maxUsers          Int      @default(40)
+  allowVisitorBuild Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  owner     User?              @relation("RoomOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  furniture PlacedFurniture[]
+  reports   ModerationReport[]
+  events    HotelEvent[]
+
+  @@index([ownerId])
+  @@index([isPublic, isOfficial])
+  @@index([theme])
+}
+
+model PlacedFurniture {
+  id            String   @id @default(cuid())
+  roomId        String
+  catalogItemId String
+  ownerId       String?
+  x             Int
+  y             Int
+  z             Float    @default(0)
+  rotation      Int      @default(0)
+  state         String   @default("default")
+  createdAt     DateTime @default(now())
+
+  room  Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  owner User? @relation("FurnitureOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  @@index([roomId])
+  @@index([ownerId])
+  @@index([roomId, x, y])
+  @@index([catalogItemId])
+}
+
+model InventoryItem {
+  id            String   @id @default(cuid())
+  userId        String
+  catalogItemId String
+  quantity      Int      @default(1)
+  acquiredAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, catalogItemId])
+  @@index([userId])
+  @@index([catalogItemId])
+}
+
+model Friendship {
+  id          String   @id @default(cuid())
+  requesterId String
+  addresseeId String
+  status      String   @default("PENDING") // PENDING, ACCEPTED, BLOCKED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  requester User @relation("FriendshipRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee User @relation("FriendshipAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, addresseeId])
+  @@index([requesterId])
+  @@index([addresseeId])
+  @@index([addresseeId, status])
+}
+
+model DirectMessage {
+  id         String   @id @default(cuid())
+  senderId   String
+  receiverId String
+  content    String
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  sender   User @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([senderId, receiverId, createdAt])
+  @@index([receiverId, read])
+}
+
+model Transaction {
+  id            String   @id @default(cuid())
+  userId        String
+  type          String
+  amountCredits Int      @default(0)
+  amountStars   Int      @default(0)
+  itemId        String?
+  description   String
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([type])
+}
+
+model TradeLog {
+  id        String   @id @default(cuid())
+  userAId   String
+  userBId   String
+  offerA    Json
+  offerB    Json
+  status    String   @default("COMPLETED")
+  createdAt DateTime @default(now())
+
+  userA User @relation("TradeUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB User @relation("TradeUserB", fields: [userBId], references: [id], onDelete: Cascade)
+
+  @@index([userAId])
+  @@index([userBId])
+  @@index([createdAt])
+}
+
+model ModerationReport {
+  id           String   @id @default(cuid())
+  reporterId   String
+  targetUserId String
+  roomId       String?
+  reason       String
+  details      String   @default("")
+  status       String   @default("OPEN")
+  createdAt    DateTime @default(now())
+
+  reporter   User  @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetUser User  @relation("ReportTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  room       Room? @relation(fields: [roomId], references: [id], onDelete: SetNull)
+
+  @@index([reporterId])
+  @@index([targetUserId])
+  @@index([roomId])
+  @@index([status, createdAt])
+}
+
+model MinigameScore {
+  id        String   @id @default(cuid())
+  userId    String
+  gameType  String
+  score     Int
+  timeMs    Int?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([gameType, score(sort: Desc)])
+  @@index([gameType, userId])
+}
+
+model HotelEvent {
+  id            String   @id @default(cuid())
+  title         String
+  description   String   @default("")
+  gameType      String
+  roomId        String
+  rewardCredits Int      @default(250)
+  startsAt      DateTime
+  endsAt        DateTime
+  status        String   @default("SCHEDULED")
+  createdAt     DateTime @default(now())
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@index([status, startsAt])
+  @@index([gameType])
+}
